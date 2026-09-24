@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Fan Portal",
+    "slug": "fan-portal",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "cl.institucion.fanportal"
+    },
+    "android": {
+      "package": "cl.institucion.fanportal"
+    },
+    "plugins": [
+      "expo-status-bar"
+    ]
+  }
+}
