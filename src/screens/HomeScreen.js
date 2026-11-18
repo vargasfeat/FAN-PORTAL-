@@ -1,9 +1,24 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { fetchTeam } from '../services/sportsApi';
 import { colors, rs } from '../theme';
 
 export default function HomeScreen({ user, navigate, onLogout }) {
+  const [team, setTeam] = useState(null);
+
+  // Datos del club desde TheSportsDB (a traves del backend)
+  useEffect(() => {
+    let active = true;
+    fetchTeam().then((res) => active && setTeam(res));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const info = team?.data;
+  const offline = team && team.source !== 'live';
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -14,6 +29,33 @@ export default function HomeScreen({ user, navigate, onLogout }) {
         <Pressable onPress={onLogout} hitSlop={12} accessibilityRole="button" accessibilityLabel="Cerrar sesión">
           <Ionicons name="log-out-outline" size={rs(26)} color="#fff" />
         </Pressable>
+      </View>
+
+      {/* Tarjeta del club */}
+      <View style={styles.teamCard}>
+        {!team ? (
+          <ActivityIndicator color={colors.primary} style={styles.teamLoader} />
+        ) : (
+          <>
+            <View style={styles.badgeBox}>
+              {info.badge ? (
+                <Image source={{ uri: info.badge }} style={styles.badge} resizeMode="contain" />
+              ) : (
+                <Text style={styles.badgeFallback}>⚽</Text>
+              )}
+            </View>
+            <View style={styles.teamInfo}>
+              <Text style={styles.teamName} numberOfLines={1}>
+                {info.name}
+              </Text>
+              <Text style={styles.teamMeta} numberOfLines={1}>
+                {[info.stadium, info.formedYear && `Fundado en ${info.formedYear}`].filter(Boolean).join(' · ') ||
+                  info.league}
+              </Text>
+              {offline && <Text style={styles.offline}>Datos del club no disponibles en línea</Text>}
+            </View>
+          </>
+        )}
       </View>
 
       <Text style={styles.question}>¿Qué quieres hacer hoy?</Text>
@@ -58,8 +100,28 @@ const styles = StyleSheet.create({
   headerText: { flex: 1 },
   greeting: { fontSize: rs(22), fontWeight: '800', color: '#fff' },
   member: { fontSize: rs(13), color: '#B8C7DA', marginTop: rs(2) },
-  question: { fontSize: rs(17), fontWeight: '700', color: colors.text, paddingHorizontal: '6%', paddingTop: '6%' },
-  actions: { flex: 1, paddingHorizontal: '6%', paddingVertical: '4%', justifyContent: 'space-between' },
+  teamCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: rs(16),
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginHorizontal: '6%',
+    marginTop: '4%',
+    padding: '3.5%',
+    minHeight: rs(72),
+  },
+  teamLoader: { flex: 1 },
+  badgeBox: { width: '18%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
+  badge: { width: '100%', height: '100%' },
+  badgeFallback: { fontSize: rs(34) },
+  teamInfo: { flex: 1, marginLeft: '3%' },
+  teamName: { fontSize: rs(17), fontWeight: '800', color: colors.text },
+  teamMeta: { fontSize: rs(12), color: colors.muted, marginTop: rs(2) },
+  offline: { fontSize: rs(11), color: colors.warning, marginTop: rs(2), fontWeight: '600' },
+  question: { fontSize: rs(17), fontWeight: '700', color: colors.text, paddingHorizontal: '6%', paddingTop: '4%' },
+  actions: { flex: 1, paddingHorizontal: '6%', paddingVertical: '3%', justifyContent: 'space-between' },
   action: {
     flex: 1,
     borderRadius: rs(20),

@@ -9,6 +9,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import CatalogScreen from './src/screens/CatalogScreen';
 import CartScreen from './src/screens/CartScreen';
 import TicketsScreen from './src/screens/TicketsScreen';
+import LeagueScreen from './src/screens/LeagueScreen';
 import { colors } from './src/theme';
 
 /**
@@ -48,6 +49,7 @@ function Root() {
     home: <HomeScreen user={user} navigate={setRoute} onLogout={() => setUser(null)} />,
     catalog: <CatalogScreen />,
     tickets: <TicketsScreen />,
+    league: <LeagueScreen />,
     cart: <CartScreen user={user} navigate={setRoute} />,
   };
 

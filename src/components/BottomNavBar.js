@@ -7,6 +7,7 @@ const TABS = [
   { key: 'home', label: 'Inicio', icon: 'home-outline', iconActive: 'home' },
   { key: 'catalog', label: 'Tienda', icon: 'shirt-outline', iconActive: 'shirt' },
   { key: 'tickets', label: 'Entradas', icon: 'ticket-outline', iconActive: 'ticket' },
+  { key: 'league', label: 'Liga', icon: 'trophy-outline', iconActive: 'trophy' },
   { key: 'cart', label: 'Carrito', icon: 'cart-outline', iconActive: 'cart' },
 ];
 
