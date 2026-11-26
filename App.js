@@ -10,6 +10,7 @@ import CatalogScreen from './src/screens/CatalogScreen';
 import CartScreen from './src/screens/CartScreen';
 import TicketsScreen from './src/screens/TicketsScreen';
 import LeagueScreen from './src/screens/LeagueScreen';
+import AdminScreen from './src/screens/AdminScreen';
 import { colors } from './src/theme';
 
 /**
@@ -50,6 +51,7 @@ function Root() {
     catalog: <CatalogScreen />,
     tickets: <TicketsScreen />,
     league: <LeagueScreen />,
+    admin: <AdminScreen user={user} navigate={setRoute} />,
     cart: <CartScreen user={user} navigate={setRoute} />,
   };
 

@@ -1,0 +1,10 @@
+[
+  {
+    "rut": "12.345.678-5",
+    "name": "Admin",
+    "memberType": "Administrador",
+    "discountRate": 0.15,
+    "role": "admin",
+    "passwordHash": "scrypt$aa85eba40a1ae8b723f86ac4f4f06fcd$c57ffba28cf33d158deca6346722f291ed5d63e50bb5045789669e6461fe8bd58f9c1fd7210485daa1cd4fdb3a65b176d487c1367f8883c38ad8f30556e5c401"
+  }
+]

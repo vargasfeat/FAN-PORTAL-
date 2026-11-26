@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import StepIndicator from '../components/StepIndicator';
 import { useCart } from '../context/CartContext';
@@ -89,7 +89,11 @@ export default function CartScreen({ user, navigate }) {
   const renderItem = ({ item }) => (
     <View style={styles.row}>
       <View style={styles.thumb}>
-        <Text style={styles.thumbEmoji}>{item.emoji}</Text>
+        {item.image ? (
+          <Image source={{ uri: item.image }} style={styles.thumbImg} resizeMode="cover" />
+        ) : (
+          <Text style={styles.thumbEmoji}>{item.emoji}</Text>
+        )}
       </View>
       <View style={styles.rowInfo}>
         <Text style={styles.rowName} numberOfLines={2}>
@@ -208,7 +212,8 @@ const styles = StyleSheet.create({
     padding: '3%',
     marginBottom: rs(10),
   },
-  thumb: { width: '20%', aspectRatio: 1, borderRadius: rs(10), backgroundColor: '#E8EDF4', alignItems: 'center', justifyContent: 'center' },
+  thumb: { width: '20%', aspectRatio: 1, borderRadius: rs(10), backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  thumbImg: { width: '100%', height: '100%' },
   thumbEmoji: { fontSize: rs(30) },
   rowInfo: { flex: 1, marginHorizontal: '3%' },
   rowName: { fontSize: rs(14), fontWeight: '600', color: colors.text },
@@ -224,7 +229,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.background,
   },
-  stepBtnDisabled: { backgroundColor: '#ECEDEF' },
+  stepBtnDisabled: { backgroundColor: colors.softDisabled },
   qty: { minWidth: rs(34), textAlign: 'center', fontSize: rs(15), fontWeight: '700', color: colors.text },
   summary: { backgroundColor: colors.surface, borderRadius: rs(14), borderWidth: 1, borderColor: colors.border, padding: '5%', marginTop: rs(6) },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: rs(6) },

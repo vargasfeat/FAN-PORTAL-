@@ -13,8 +13,9 @@ const MEMBERS = [
   {
     rut: '12.345.678-5',
     password: 'socio123',
-    name: 'Camila Rojas',
-    memberType: 'Socio Oro',
+    name: 'Admin',
+    memberType: 'Administrador',
+    role: 'admin',
     discountRate: 0.15,
   },
 ];

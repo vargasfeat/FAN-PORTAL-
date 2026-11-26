@@ -1,0 +1,146 @@
+[
+  {
+    "id": "P001",
+    "name": "Camiseta Titular 2026",
+    "price": 34990,
+    "stock": 12,
+    "image": "",
+    "emoji": "👕"
+  },
+  {
+    "id": "P002",
+    "name": "Camiseta Visitante 2026",
+    "price": 34990,
+    "stock": 8,
+    "image": "",
+    "emoji": "👕"
+  },
+  {
+    "id": "P003",
+    "name": "Camiseta Arquero",
+    "price": 36990,
+    "stock": 0,
+    "image": "",
+    "emoji": "🧤"
+  },
+  {
+    "id": "P004",
+    "name": "Polerón de Concentración",
+    "price": 42990,
+    "stock": 5,
+    "image": "",
+    "emoji": "🧥"
+  },
+  {
+    "id": "P005",
+    "name": "Chaqueta Cortaviento",
+    "price": 45990,
+    "stock": 2,
+    "image": "",
+    "emoji": "🧥"
+  },
+  {
+    "id": "P006",
+    "name": "Short Oficial",
+    "price": 19990,
+    "stock": 20,
+    "image": "",
+    "emoji": "🩳"
+  },
+  {
+    "id": "P007",
+    "name": "Bufanda Hinchada",
+    "price": 9990,
+    "stock": 30,
+    "image": "",
+    "emoji": "🧣"
+  },
+  {
+    "id": "P008",
+    "name": "Gorro de Lana",
+    "price": 12990,
+    "stock": 0,
+    "image": "",
+    "emoji": "🧶"
+  },
+  {
+    "id": "P009",
+    "name": "Jockey Clásico",
+    "price": 14990,
+    "stock": 15,
+    "image": "",
+    "emoji": "🧢"
+  },
+  {
+    "id": "P010",
+    "name": "Pelota Réplica N°5",
+    "price": 24990,
+    "stock": 7,
+    "image": "",
+    "emoji": "⚽"
+  },
+  {
+    "id": "P011",
+    "name": "Mochila Deportiva",
+    "price": 27990,
+    "stock": 3,
+    "image": "",
+    "emoji": "🎒"
+  },
+  {
+    "id": "P012",
+    "name": "Calcetas Oficiales (par)",
+    "price": 6990,
+    "stock": 40,
+    "image": "",
+    "emoji": "🧦"
+  },
+  {
+    "id": "P013",
+    "name": "Camiseta Retro 1990",
+    "price": 39990,
+    "stock": 0,
+    "image": "",
+    "emoji": "👕"
+  },
+  {
+    "id": "P014",
+    "name": "Buzo de Entrenamiento",
+    "price": 49990,
+    "stock": 9,
+    "image": "",
+    "emoji": "🏃"
+  },
+  {
+    "id": "P015",
+    "name": "Botella Térmica",
+    "price": 11990,
+    "stock": 25,
+    "image": "",
+    "emoji": "🥤"
+  },
+  {
+    "id": "P016",
+    "name": "Bandera Oficial 90x150",
+    "price": 15990,
+    "stock": 1,
+    "image": "",
+    "emoji": "🚩"
+  },
+  {
+    "id": "P017",
+    "name": "Polera Niño Titular",
+    "price": 24990,
+    "stock": 10,
+    "image": "",
+    "emoji": "👕"
+  },
+  {
+    "id": "P018",
+    "name": "Parka de Invierno",
+    "price": 69990,
+    "stock": 4,
+    "image": "",
+    "emoji": "🧥"
+  }
+]

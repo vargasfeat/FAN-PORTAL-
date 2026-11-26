@@ -1,9 +1,10 @@
-import React, { memo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { memo, useState } from 'react';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, rs } from '../theme';
 import { formatCLP } from '../utils/helpers';
 
 function ProductCard({ product, inCartQty = 0, onAdd }) {
+  const [imgFailed, setImgFailed] = useState(false);
   // PC-02: stock <= 0 => estado visual deshabilitado y sin acción posible
   const soldOut = product.stock <= 0;
   const reachedLimit = !soldOut && inCartQty >= product.stock;
@@ -15,7 +16,16 @@ function ProductCard({ product, inCartQty = 0, onAdd }) {
   return (
     <View style={styles.card}>
       <View style={[styles.imageBox, soldOut && styles.imageBoxSoldOut]}>
-        <Text style={[styles.emoji, soldOut && styles.emojiSoldOut]}>{product.emoji}</Text>
+        {product.image && !imgFailed ? (
+          <Image
+            source={{ uri: product.image }}
+            style={[styles.photo, soldOut && styles.photoSoldOut]}
+            resizeMode="cover"
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <Text style={[styles.emoji, soldOut && styles.emojiSoldOut]}>{product.emoji}</Text>
+        )}
         {soldOut && (
           <View style={styles.soldOutTag}>
             <Text style={styles.soldOutTagText}>Sin stock</Text>
@@ -64,11 +74,13 @@ const styles = StyleSheet.create({
   imageBox: {
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: '#E8EDF4',
+    backgroundColor: colors.tint,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  imageBoxSoldOut: { backgroundColor: '#ECEDEF' },
+  imageBoxSoldOut: { backgroundColor: colors.softDisabled },
+  photo: { width: '100%', height: '100%' },
+  photoSoldOut: { opacity: 0.35 },
   emoji: { fontSize: rs(54) },
   emojiSoldOut: { opacity: 0.35 },
   soldOutTag: {

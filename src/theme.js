@@ -1,4 +1,5 @@
 import { Dimensions, PixelRatio } from 'react-native';
+import { ACTIVE_CLUB, CLUBS } from './clubTheme';
 
 const { width } = Dimensions.get('window');
 const BASE_WIDTH = 375; // ancho de referencia de diseño (iPhone estándar)
@@ -14,16 +15,18 @@ export const rs = (size) => {
   return Math.round(PixelRatio.roundToNearestPixel(size * factor));
 };
 
-export const colors = {
-  primary: '#0E2A47', // azul institucional
-  accent: '#C8202F', // rojo de entradas / acciones de venta
-  background: '#F3F5F8',
+// Colores que no dependen del club
+const baseColors = {
   surface: '#FFFFFF',
-  text: '#14213D',
   muted: '#667085',
-  border: '#DDE2EA',
   disabled: '#CBD0D8',
   disabledText: '#8A919C',
   success: '#17825A',
   warning: '#B45309',
 };
+
+// El tema se elige en src/clubTheme.js (linea ACTIVE_CLUB)
+const preset = CLUBS[ACTIVE_CLUB] || CLUBS.colocolo;
+
+export const club = { key: CLUBS[ACTIVE_CLUB] ? ACTIVE_CLUB : 'colocolo', name: preset.name };
+export const colors = { ...baseColors, ...preset.colors };

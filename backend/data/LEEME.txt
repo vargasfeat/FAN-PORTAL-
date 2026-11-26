@@ -1,0 +1,45 @@
+CATALOGO DE INDUMENTARIA — COMO EDITARLO
+=========================================
+
+Todo el catalogo vive en el archivo  catalog.json  (esta misma carpeta).
+Cada producto es un bloque asi:
+
+  {
+    "id": "P001",                       <- codigo unico, no repetir
+    "name": "Camiseta Titular 2026",    <- nombre que ve el socio
+    "price": 34990,                     <- precio en pesos, SIN puntos ni $
+    "stock": 12,                        <- unidades disponibles (0 = "Agotado")
+    "image": "camiseta-titular.jpg",    <- nombre del archivo de la foto ("" = sin foto)
+    "emoji": "👕"                       <- icono que se muestra si no hay foto
+  }
+
+CAMBIAR UN PRECIO
+  1. Abre catalog.json, cambia el numero de "price" y guarda (Ctrl + S).
+  2. En la app, desliza hacia abajo o recarga: no hay que reiniciar nada.
+
+CAMBIAR O AGREGAR UNA FOTO
+  1. Copia la foto a la carpeta  backend/public/products/
+     (recomendado: cuadrada, 600 x 600 px o mas, JPG o PNG, menos de 300 KB).
+  2. En catalog.json, escribe el nombre EXACTO del archivo en "image".
+     Tambien puedes pegar un enlace completo que empiece con https://
+  3. Guarda y recarga la app.
+
+AGREGAR UN PRODUCTO
+  Copia un bloque completo, pegalo al final (poniendo una coma entre bloques),
+  y cambia "id", "name", "price", "stock" e "image".
+
+OCULTAR UN PRODUCTO SIN BORRARLO
+  Agrega la linea  "active": false  dentro de su bloque.
+
+ANTES DE PROBAR, REVISA QUE NO HAYA ERRORES (desde la carpeta backend):
+  npm run catalog:check
+
+MODO ADMINISTRADOR (DENTRO DE LA APP)
+=====================================
+Tambien puedes editar precios, stock y fotos desde la app, sin tocar este archivo:
+  1. Inicia sesion con la cuenta de administrador (RUT 12.345.678-5).
+  2. En Inicio aparece el boton "Modo administrador".
+  3. Toca un producto para editarlo, o "Nuevo" para agregar uno.
+Los cambios se guardan en catalog.json y la carpeta public/products automaticamente.
+Las cuentas viven en data/members.json. Para cambiar una clave:
+  node scripts/hash-password.js NuevaClave     (pega el resultado en "passwordHash")

@@ -3,7 +3,7 @@ import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-nativ
 import ProductCard from '../components/ProductCard';
 import StepIndicator from '../components/StepIndicator';
 import { useCart } from '../context/CartContext';
-import { fetchProducts } from '../data/mockData';
+import { fetchProducts } from '../services/catalogApi';
 import { colors, rs } from '../theme';
 
 const PAGE_SIZE = 6; // se renderizan/piden 6 productos por bloque
