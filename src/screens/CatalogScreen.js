@@ -42,7 +42,16 @@ export default function CatalogScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const qtyById = useMemo(() => Object.fromEntries(items.map((i) => [i.id, i.quantity])), [items]);
+  const qtyByProductAndSize = useMemo(() => {
+    const map = {};
+    for (const item of items) {
+      const pid = item.productId || item.id;
+      const sz = item.size || 'Única';
+      if (!map[pid]) map[pid] = {};
+      map[pid][sz] = (map[pid][sz] || 0) + item.quantity;
+    }
+    return map;
+  }, [items]);
 
   const showToast = useCallback((message) => {
     setToast(message);
@@ -53,7 +62,8 @@ export default function CatalogScreen() {
   const handleAdd = useCallback(
     (product) => {
       const result = addItem(product);
-      if (result.ok) showToast(`${product.name} agregado al carrito`);
+      const sizeSuffix = product.selectedSize ? ` (Talla ${product.selectedSize})` : '';
+      if (result.ok) showToast(`${product.name}${sizeSuffix} agregado al carrito`);
       else if (result.reason === 'sin_stock') showToast('Producto agotado');
       else showToast('Ya tienes todo el stock disponible en tu carrito');
     },
@@ -61,8 +71,8 @@ export default function CatalogScreen() {
   );
 
   const renderItem = useCallback(
-    ({ item }) => <ProductCard product={item} inCartQty={qtyById[item.id] || 0} onAdd={handleAdd} />,
-    [qtyById, handleAdd]
+    ({ item }) => <ProductCard product={item} cartQtyBySize={qtyByProductAndSize[item.id] || {}} onAdd={handleAdd} />,
+    [qtyByProductAndSize, handleAdd]
   );
 
   return (
@@ -71,7 +81,7 @@ export default function CatalogScreen() {
         data={products}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        extraData={qtyById}
+        extraData={qtyByProductAndSize}
         numColumns={2}
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.content}

@@ -209,8 +209,6 @@ export default function LoginScreen({ onLogin }) {
             </Text>
           </Pressable>
         </View>
-
-        <Text style={styles.demo}>Demo: 12.345.678-5 · socio123</Text>
       </ScrollView>
 
       <Modal visible={showTerms} animationType="slide" transparent onRequestClose={() => setShowTerms(false)}>
@@ -270,7 +268,6 @@ const styles = StyleSheet.create({
   hint: { textAlign: 'center', fontSize: rs(12), color: colors.muted, marginTop: rs(10) },
   switchModeBtn: { marginTop: rs(16), alignItems: 'center', paddingVertical: rs(6) },
   switchModeText: { fontSize: rs(13), fontWeight: '700', color: colors.primary, textDecorationLine: 'underline' },
-  demo: { textAlign: 'center', color: colors.onPrimaryFaint, fontSize: rs(12), marginTop: '6%' },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   modalCard: { maxHeight: '70%', backgroundColor: colors.surface, borderTopLeftRadius: rs(20), borderTopRightRadius: rs(20), padding: '6%' },
   modalTitle: { fontSize: rs(18), fontWeight: '800', color: colors.text, marginBottom: rs(10) },

@@ -1,4 +1,4 @@
-import { API_TIMEOUT_MS, API_URL } from '../config';
+import { apiRequest } from './httpClient';
 
 // Datos de respaldo: si el backend esta caido, la app sigue mostrando algo coherente.
 const OFFLINE = {
@@ -16,15 +16,9 @@ const OFFLINE = {
 };
 
 async function get(path) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
-  try {
-    const res = await fetch(`${API_URL}${path}`, { signal: controller.signal });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json(); // { source: 'live' | 'fallback', data }
-  } finally {
-    clearTimeout(timer);
-  }
+  return apiRequest(path, {
+    fallbackErrorMessage: 'No se pudieron obtener los datos deportivos.',
+  }); // { source: 'live' | 'fallback', data }
 }
 
 /** Nunca lanza error: ante una caida del middleware devuelve source = 'offline'. */

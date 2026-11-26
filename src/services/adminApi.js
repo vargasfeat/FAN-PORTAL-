@@ -1,27 +1,17 @@
-import { API_TIMEOUT_MS, API_URL } from '../config';
+import { API_TIMEOUT_MS } from '../config';
+import { apiRequest } from './httpClient';
 
 async function request(token, method, path, body) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS * 2); // las fotos tardan mas en subir
-  try {
-    const res = await fetch(`${API_URL}${path}`, {
-      method,
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: body ? JSON.stringify(body) : undefined,
-      signal: controller.signal,
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json.error || `Error ${res.status}`);
-    return json;
-  } catch (e) {
-    if (e.name === 'AbortError') throw new Error('El servidor tardó demasiado en responder.');
-    if (e.message === 'Network request failed' || e.message === 'Failed to fetch') {
-      throw new Error('No hay conexión con el servidor.');
-    }
-    throw e;
-  } finally {
-    clearTimeout(timer);
-  }
+  return apiRequest(path, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body,
+    timeoutMs: API_TIMEOUT_MS * 2, // las fotos tardan mas en subir
+    fallbackErrorMessage: 'Error en la operación de administración.',
+  });
 }
 
 export const listAdminProducts = (token) => request(token, 'GET', '/api/admin/products');

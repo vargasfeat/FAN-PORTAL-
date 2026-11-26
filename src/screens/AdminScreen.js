@@ -22,6 +22,15 @@ import { colors, rs } from '../theme';
 import { formatCLP } from '../utils/helpers';
 
 const digits = (t) => t.replace(/[^0-9]/g, '');
+const DEFAULT_SIZE_PRESETS = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+
+function hasMultipleOrNamedSizes(product) {
+  if (!Array.isArray(product?.sizes) || product.sizes.length === 0) return false;
+  if (product.sizes.length === 1 && String(product.sizes[0].talla || '').toLowerCase() === 'única') {
+    return false;
+  }
+  return true;
+}
 
 function Thumb({ product, size }) {
   return (
@@ -42,6 +51,9 @@ function EditorModal({ visible, product, token, onClose, onSaved }) {
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
   const [active, setActive] = useState(true);
+  const [sizeMode, setSizeMode] = useState('single'); // 'single' | 'multiple'
+  const [sizeRows, setSizeRows] = useState([]); // [{ talla, stock }]
+  const [customSize, setCustomSize] = useState('');
   const [photo, setPhoto] = useState(null); // { uri, base64 } elegida en este editor
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -52,10 +64,56 @@ function EditorModal({ visible, product, token, onClose, onSaved }) {
     setPrice(product ? String(product.price) : '');
     setStock(product ? String(product.stock) : '');
     setActive(product ? product.active : true);
+
+    if (hasMultipleOrNamedSizes(product)) {
+      setSizeMode('multiple');
+      setSizeRows(
+        product.sizes.map((s) => ({
+          talla: String(s.talla),
+          stock: String(s.stock ?? 0),
+        }))
+      );
+    } else {
+      setSizeMode('single');
+      setSizeRows([
+        { talla: 'S', stock: '0' },
+        { talla: 'M', stock: '0' },
+        { talla: 'L', stock: '0' },
+        { talla: 'XL', stock: '0' },
+      ]);
+    }
+    setCustomSize('');
     setPhoto(null);
     setError('');
     setSaving(false);
   }, [visible, product]);
+
+  const togglePresetSize = (talla) => {
+    setSizeRows((prev) => {
+      const exists = prev.some((r) => r.talla.toUpperCase() === talla.toUpperCase());
+      if (exists) return prev.filter((r) => r.talla.toUpperCase() !== talla.toUpperCase());
+      return [...prev, { talla, stock: '0' }];
+    });
+  };
+
+  const addCustomSize = () => {
+    const clean = customSize.trim().toUpperCase();
+    if (!clean) return;
+    setSizeRows((prev) => {
+      if (prev.some((r) => r.talla.toUpperCase() === clean)) return prev;
+      return [...prev, { talla: clean, stock: '0' }];
+    });
+    setCustomSize('');
+  };
+
+  const updateSizeStock = (talla, val) => {
+    const cleanNum = digits(val);
+    setSizeRows((prev) =>
+      prev.map((r) => (r.talla === talla ? { ...r, stock: cleanNum } : r))
+    );
+  };
+
+  const totalSizeStock = sizeRows.reduce((sum, r) => sum + Number(r.stock || 0), 0);
 
   const pickPhoto = async () => {
     setError('');
@@ -70,7 +128,22 @@ function EditorModal({ visible, product, token, onClose, onSaved }) {
       if (result.canceled || !result.assets?.length) return;
       const asset = result.assets[0];
       let base64 = asset.base64;
-      if (!base64 && asset.uri?.startsWith('data:')) base64 = asset.uri.split(',')[1];
+      if (!base64 && asset.uri?.startsWith('data:')) {
+        base64 = asset.uri.split(',')[1];
+      }
+      if (!base64 && asset.uri) {
+        const resp = await fetch(asset.uri);
+        const blob = await resp.blob();
+        base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const resStr = String(reader.result || '');
+            resolve(resStr.includes(',') ? resStr.split(',')[1] : '');
+          };
+          reader.onerror = () => reject(new Error('No se pudo leer la imagen elegida.'));
+          reader.readAsDataURL(blob);
+        });
+      }
       if (!base64) throw new Error('No se pudo leer la imagen elegida.');
       setPhoto({ uri: asset.uri, base64 });
     } catch (e) {
@@ -81,12 +154,29 @@ function EditorModal({ visible, product, token, onClose, onSaved }) {
   const save = async () => {
     if (!name.trim()) return setError('Escribe el nombre del producto.');
     if (price === '') return setError('Escribe el precio.');
-    if (stock === '') return setError('Escribe el stock (0 si está agotado).');
+    if (sizeMode === 'single' && stock === '') {
+      return setError('Escribe el stock (0 si está agotado).');
+    }
+    if (sizeMode === 'multiple' && sizeRows.length === 0) {
+      return setError('Selecciona al menos una talla o cambia a Talla única.');
+    }
 
     setSaving(true);
     setError('');
     try {
-      const data = { name: name.trim(), price: Number(price), stock: Number(stock), active };
+      const sizesPayload =
+        sizeMode === 'multiple'
+          ? sizeRows.map((r) => ({ talla: r.talla, stock: Number(r.stock || 0) }))
+          : [];
+      const stockPayload = sizeMode === 'multiple' ? totalSizeStock : Number(stock);
+
+      const data = {
+        name: name.trim(),
+        price: Number(price),
+        stock: stockPayload,
+        active,
+        sizes: sizesPayload,
+      };
       let saved = isNew ? await createProduct(token, data) : await updateProduct(token, product.id, data);
       if (photo) saved = await uploadProductImage(token, saved.id, photo.base64);
       onSaved(saved);
@@ -124,11 +214,88 @@ function EditorModal({ visible, product, token, onClose, onSaved }) {
                 {price !== '' && <Text style={styles.hint}>{formatCLP(Number(price))}</Text>}
               </View>
               <View style={styles.col}>
-                <Text style={styles.label}>Stock</Text>
-                <TextInput style={styles.input} value={stock} onChangeText={(t) => setStock(digits(t))} keyboardType="number-pad" placeholder="10" placeholderTextColor={colors.disabledText} />
-                <Text style={styles.hint}>0 = Agotado</Text>
+                <Text style={styles.label}>{sizeMode === 'multiple' ? 'Stock total' : 'Stock'}</Text>
+                {sizeMode === 'multiple' ? (
+                  <View style={[styles.input, styles.readOnlyBox]}>
+                    <Text style={styles.readOnlyText}>{totalSizeStock}</Text>
+                  </View>
+                ) : (
+                  <TextInput style={styles.input} value={stock} onChangeText={(t) => setStock(digits(t))} keyboardType="number-pad" placeholder="10" placeholderTextColor={colors.disabledText} />
+                )}
+                <Text style={styles.hint}>{sizeMode === 'multiple' ? 'Suma de tallas' : '0 = Agotado'}</Text>
               </View>
             </View>
+
+            <Text style={styles.label}>Tallas del producto</Text>
+            <View style={styles.modeRow}>
+              <Pressable
+                style={[styles.modeBtn, sizeMode === 'single' && styles.modeBtnActive]}
+                onPress={() => setSizeMode('single')}
+              >
+                <Text style={[styles.modeBtnText, sizeMode === 'single' && styles.modeBtnTextActive]}>
+                  Talla única
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modeBtn, sizeMode === 'multiple' && styles.modeBtnActive]}
+                onPress={() => setSizeMode('multiple')}
+              >
+                <Text style={[styles.modeBtnText, sizeMode === 'multiple' && styles.modeBtnTextActive]}>
+                  Por tallas
+                </Text>
+              </Pressable>
+            </View>
+
+            {sizeMode === 'multiple' && (
+              <View style={styles.sizesBox}>
+                <Text style={styles.hint}>Activa las tallas disponibles e indica el stock de cada una:</Text>
+                <View style={styles.chipsRow}>
+                  {DEFAULT_SIZE_PRESETS.map((sz) => {
+                    const activeChip = sizeRows.some((r) => r.talla.toUpperCase() === sz);
+                    return (
+                      <Pressable
+                        key={sz}
+                        onPress={() => togglePresetSize(sz)}
+                        style={[styles.chip, activeChip && styles.chipActive]}
+                      >
+                        <Text style={[styles.chipText, activeChip && styles.chipTextActive]}>{sz}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <View style={styles.customSizeRow}>
+                  <TextInput
+                    style={[styles.input, styles.customSizeInput]}
+                    value={customSize}
+                    onChangeText={setCustomSize}
+                    maxLength={12}
+                    placeholder="Otra talla (ej. 38, INF)"
+                    placeholderTextColor={colors.disabledText}
+                  />
+                  <Pressable style={styles.customSizeBtn} onPress={addCustomSize}>
+                    <Text style={styles.customSizeBtnText}>Agregar</Text>
+                  </Pressable>
+                </View>
+
+                {sizeRows.map((row) => (
+                  <View key={row.talla} style={styles.sizeStockRow}>
+                    <Text style={styles.sizeStockLabel}>Talla {row.talla}</Text>
+                    <TextInput
+                      style={styles.sizeStockInput}
+                      value={row.stock}
+                      onChangeText={(t) => updateSizeStock(row.talla, t)}
+                      keyboardType="number-pad"
+                      placeholder="0"
+                      placeholderTextColor={colors.disabledText}
+                    />
+                    <Pressable onPress={() => togglePresetSize(row.talla)} hitSlop={8}>
+                      <Ionicons name="close-circle-outline" size={rs(20)} color={colors.muted} />
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            )}
 
             <View style={styles.switchRow}>
               <Text style={styles.switchLabel}>Visible en la tienda</Text>
@@ -234,6 +401,9 @@ export default function AdminScreen({ user, navigate }) {
               <Text style={styles.rowName} numberOfLines={2}>{item.name}</Text>
               <Text style={styles.rowMeta}>
                 {formatCLP(item.price)} · {item.stock <= 0 ? 'Agotado' : `Stock ${item.stock}`}
+                {hasMultipleOrNamedSizes(item)
+                  ? ` · Tallas: ${item.sizes.map((s) => s.talla).join(', ')}`
+                  : ' · Talla única'}
                 {!item.active ? ' · Oculto' : ''}
               </Text>
             </View>
@@ -301,6 +471,79 @@ const styles = StyleSheet.create({
   hint: { fontSize: rs(11), color: colors.muted, marginTop: rs(4) },
   twoCols: { flexDirection: 'row', justifyContent: 'space-between' },
   col: { width: '48%' },
+  readOnlyBox: { justifyContent: 'center', opacity: 0.7 },
+  readOnlyText: { fontSize: rs(16), fontWeight: '700', color: colors.text },
+  modeRow: { flexDirection: 'row', gap: rs(8) },
+  modeBtn: {
+    flex: 1,
+    minHeight: rs(42),
+    borderRadius: rs(10),
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modeBtnActive: { borderColor: colors.primary, backgroundColor: colors.tint },
+  modeBtnText: { fontSize: rs(13), fontWeight: '700', color: colors.muted },
+  modeBtnTextActive: { color: colors.primary },
+  sizesBox: {
+    marginTop: rs(10),
+    padding: rs(10),
+    borderRadius: rs(12),
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: rs(6), marginTop: rs(8) },
+  chip: {
+    paddingHorizontal: rs(12),
+    paddingVertical: rs(6),
+    borderRadius: rs(8),
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  chipActive: { borderColor: colors.primary, backgroundColor: colors.primary },
+  chipText: { fontSize: rs(12), fontWeight: '700', color: colors.text },
+  chipTextActive: { color: '#fff' },
+  customSizeRow: { flexDirection: 'row', alignItems: 'center', marginTop: rs(10), gap: rs(8) },
+  customSizeInput: { flex: 1, minHeight: rs(40), fontSize: rs(14) },
+  customSizeBtn: {
+    minHeight: rs(40),
+    paddingHorizontal: rs(12),
+    borderRadius: rs(10),
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  customSizeBtnText: { color: '#fff', fontSize: rs(12), fontWeight: '700' },
+  sizeStockRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: rs(8),
+    paddingVertical: rs(6),
+    paddingHorizontal: rs(10),
+    borderRadius: rs(8),
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  sizeStockLabel: { fontSize: rs(13), fontWeight: '700', color: colors.text, flex: 1 },
+  sizeStockInput: {
+    width: rs(72),
+    minHeight: rs(36),
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: rs(8),
+    paddingHorizontal: rs(8),
+    textAlign: 'center',
+    fontSize: rs(14),
+    color: colors.text,
+    backgroundColor: colors.background,
+    marginRight: rs(8),
+  },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: rs(16) },
   switchLabel: { fontSize: rs(14), fontWeight: '600', color: colors.text },
   error: { color: colors.accent, fontSize: rs(13), marginTop: rs(12) },

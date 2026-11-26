@@ -12,10 +12,10 @@ class CatalogError extends Error {
   }
 }
 
-/** Devuelve la URL pública de la foto, o null si no hay foto o el archivo no existe. */
+/** Devuelve la URL pública (o Data URI) de la foto, o null si no hay foto o el archivo no existe. */
 function resolveImage(image, baseUrl) {
   if (!image || typeof image !== 'string') return null;
-  if (/^https?:\/\//i.test(image)) return image;
+  if (/^(https?:\/\/|data:image\/)/i.test(image)) return image;
   if (image.startsWith('/uploads/') || image.startsWith('/static/')) {
     return baseUrl ? `${baseUrl}${image}` : image;
   }
@@ -149,6 +149,33 @@ function cleanFields(input = {}, { partial }) {
     out.active = rawActive;
   }
 
+  const rawSizes = input.sizes !== undefined ? input.sizes : input.tallas;
+  if (rawSizes !== undefined) {
+    if (!Array.isArray(rawSizes)) {
+      throw new CatalogError('"sizes" debe ser una lista de tallas.');
+    }
+    const seen = new Set();
+    out.sizes = rawSizes.map((s) => {
+      const talla = String(s?.talla ?? s?.size ?? '').trim();
+      const stock = Number(s?.stock ?? 0);
+      if (!talla || talla.length > 20) {
+        throw new CatalogError('Cada talla debe tener un nombre válido (máximo 20 caracteres).');
+      }
+      if (!Number.isInteger(stock) || stock < 0 || stock > 100000) {
+        throw new CatalogError(`El stock de la talla "${talla}" debe ser un entero entre 0 y 100.000.`);
+      }
+      const key = talla.toUpperCase();
+      if (seen.has(key)) {
+        throw new CatalogError(`La talla "${talla}" está repetida.`);
+      }
+      seen.add(key);
+      return { talla, stock };
+    });
+    if (out.sizes.length > 0) {
+      out.stock = out.sizes.reduce((sum, s) => sum + s.stock, 0);
+    }
+  }
+
   return out;
 }
 
@@ -177,20 +204,44 @@ async function findProductByIdentifier(idOrSku) {
   return rows[0] || null;
 }
 
+async function syncProductSizes(client, productId, sizes) {
+  await client.query('DELETE FROM producto_tallas WHERE producto_id = $1', [productId]);
+  for (const s of sizes) {
+    await client.query(
+      'INSERT INTO producto_tallas (producto_id, talla, stock) VALUES ($1, $2, $3)',
+      [productId, s.talla, s.stock]
+    );
+  }
+}
+
 async function createProduct(input, baseUrl) {
   const fields = cleanFields(input, { partial: false });
   const sku = (input.codigo_sku || input.sku || (await generateNextSku())).trim();
   const category = fields.category || 'General';
   const active = fields.active !== undefined ? fields.active : true;
+  const sizes = fields.sizes || [];
 
-  const { rows } = await pool.query(
-    `INSERT INTO productos (codigo_sku, nombre, categoria, precio, stock, activo, imagen_url)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING *`,
-    [sku, fields.name, category, fields.price, fields.stock, active, '']
-  );
-
-  return mapProductRow({ ...rows[0], tallas: [] }, baseUrl, { includeInactive: true });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `INSERT INTO productos (codigo_sku, nombre, categoria, precio, stock, activo, imagen_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [sku, fields.name, category, fields.price, fields.stock, active, '']
+    );
+    const created = rows[0];
+    if (sizes.length > 0) {
+      await syncProductSizes(client, created.id, sizes);
+    }
+    await client.query('COMMIT');
+    return mapProductRow({ ...created, tallas: sizes }, baseUrl, { includeInactive: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 async function updateProduct(id, input, baseUrl) {
@@ -204,24 +255,37 @@ async function updateProduct(id, input, baseUrl) {
   const nextCategory = fields.category !== undefined ? fields.category : existing.categoria;
   const nextActive = fields.active !== undefined ? fields.active : existing.activo;
 
-  const { rows } = await pool.query(
-    `UPDATE productos
-     SET nombre = $1,
-         precio = $2,
-         stock = $3,
-         categoria = $4,
-         activo = $5
-     WHERE id = $6
-     RETURNING *`,
-    [nextName, nextPrice, nextStock, nextCategory, nextActive, existing.id]
-  );
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `UPDATE productos
+       SET nombre = $1,
+           precio = $2,
+           stock = $3,
+           categoria = $4,
+           activo = $5
+       WHERE id = $6
+       RETURNING *`,
+      [nextName, nextPrice, nextStock, nextCategory, nextActive, existing.id]
+    );
 
-  const tallasRes = await pool.query(
-    'SELECT talla, stock FROM producto_tallas WHERE producto_id = $1 ORDER BY id',
-    [existing.id]
-  );
+    if (fields.sizes !== undefined) {
+      await syncProductSizes(client, existing.id, fields.sizes);
+    }
 
-  return mapProductRow({ ...rows[0], tallas: tallasRes.rows }, baseUrl, { includeInactive: true });
+    const tallasRes = await client.query(
+      'SELECT talla, stock FROM producto_tallas WHERE producto_id = $1 ORDER BY id',
+      [existing.id]
+    );
+    await client.query('COMMIT');
+    return mapProductRow({ ...rows[0], tallas: tallasRes.rows }, baseUrl, { includeInactive: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 function detectImageExt(buf) {
@@ -246,27 +310,12 @@ async function saveProductImage(id, base64, baseUrl) {
   const product = await findProductByIdentifier(id);
   if (!product) throw new CatalogError('Producto no encontrado.', 404);
 
-  fs.mkdirSync(IMAGES_DIR, { recursive: true });
-  const safePrefix = String(product.codigo_sku || product.id).replace(/[^A-Za-z0-9_-]/g, '');
-  const filename = `${safePrefix}-${Date.now()}.${ext}`;
-  fs.writeFileSync(path.join(IMAGES_DIR, filename), buf);
-
-  const old =
-    product.imagen_url && !/^https?:\/\//i.test(product.imagen_url) && !product.imagen_url.startsWith('/uploads/')
-      ? path.basename(product.imagen_url)
-      : null;
-
-  if (old && old.startsWith(`${safePrefix}-`) && old !== filename) {
-    try {
-      fs.unlinkSync(path.join(IMAGES_DIR, old));
-    } catch (e) {
-      /* si ya no existe, no importa */
-    }
-  }
+  const mime = ext === 'jpg' ? 'jpeg' : ext;
+  const dataUri = `data:image/${mime};base64,${buf.toString('base64')}`;
 
   const { rows } = await pool.query(
     'UPDATE productos SET imagen_url = $1 WHERE id = $2 RETURNING *',
-    [filename, product.id]
+    [dataUri, product.id]
   );
 
   const tallasRes = await pool.query(

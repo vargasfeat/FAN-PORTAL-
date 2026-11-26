@@ -11,9 +11,32 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import QrCodeBox from '../components/QrCodeBox';
 import { updateProfile } from '../services/authApi';
 import { fetchTeam } from '../services/sportsApi';
 import { colors, rs } from '../theme';
+import { cleanRut } from '../utils/helpers';
+
+function getMemberNumber(user) {
+  if (user?.memberNumber) return String(user.memberNumber);
+  if (user?.id !== undefined && user?.id !== null && String(user.id).trim() !== '') {
+    return `FP-${String(user.id).padStart(6, '0')}`;
+  }
+  const digits = cleanRut(user?.rut || '').replace(/[^0-9]/g, '');
+  const numeric = digits ? digits.slice(-6).padStart(6, '0') : '000001';
+  return `FP-${numeric}`;
+}
+
+function getMembershipMeta(user) {
+  const raw = String(user?.subscriptionStatus || (user?.discountRate > 0 ? 'ACTIVO' : 'INACTIVO')).toUpperCase();
+  if (raw === 'ACTIVO') {
+    return { label: 'Membresía Activa', bg: '#dcfce7', text: '#15803d', border: '#86efac' };
+  }
+  if (raw === 'ATRASADO') {
+    return { label: 'Membresía Atrasada', bg: '#fef3c7', text: '#b45309', border: '#fcd34d' };
+  }
+  return { label: 'Membresía Inactiva', bg: '#fee2e2', text: '#b91c1c', border: '#fca5a5' };
+}
 
 export default function HomeScreen({ user, navigate, onLogout, onUpdateUser }) {
   const [team, setTeam] = useState(null);
@@ -49,14 +72,17 @@ export default function HomeScreen({ user, navigate, onLogout, onUpdateUser }) {
   const rutValue = currentUser?.rut || 'No registrado';
   const emailValue = currentUser?.email || 'No registrado';
   const roleValue = currentUser?.role || 'socio';
+  const memberNumber = getMemberNumber(currentUser);
+  const membership = getMembershipMeta(currentUser);
+  const qrPayload = `SOCIO:${memberNumber}|RUT:${cleanRut(rutValue) || 'SIN_RUT'}|ESTADO:${membership.label}`;
 
-  const openProfileModal = () => {
+  const openProfileModal = (editImmediately = false) => {
     setNombreInput(fullName);
     setEmailInput(currentUser?.email || '');
     setPasswordInput('');
     setProfileError('');
     setProfileSuccess('');
-    setIsEditing(false);
+    setIsEditing(editImmediately);
     setShowProfile(true);
   };
 
@@ -86,6 +112,7 @@ export default function HomeScreen({ user, navigate, onLogout, onUpdateUser }) {
         name: updated?.nombre || nombreInput.trim(),
         nombre: updated?.nombre || nombreInput.trim(),
         email: updated?.email ?? (emailInput.trim() || null),
+        subscriptionStatus: updated?.estado_afiliacion || currentUser?.subscriptionStatus,
       };
 
       setCurrentUser(mergedUser);
@@ -104,86 +131,136 @@ export default function HomeScreen({ user, navigate, onLogout, onUpdateUser }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Pressable
-          style={styles.headerText}
-          onPress={openProfileModal}
-          accessibilityRole="button"
-          accessibilityLabel="Ver o editar datos de mi perfil"
-        >
+        <View style={styles.headerText}>
           <View style={styles.greetingRow}>
             <Text style={styles.greeting}>Hola, {firstName}</Text>
-            <Ionicons name="person-circle-outline" size={rs(20)} color="#fff" style={styles.profileIcon} />
           </View>
-          <Text style={styles.member}>{memberLabel} · Ver perfil</Text>
-        </Pressable>
+          <Text style={styles.member}>
+            {memberLabel} · Socio {memberNumber}
+          </Text>
+        </View>
 
         <Pressable onPress={onLogout} hitSlop={12} accessibilityRole="button" accessibilityLabel="Cerrar sesión">
           <Ionicons name="log-out-outline" size={rs(26)} color="#fff" />
         </Pressable>
       </View>
 
-      {/* Tarjeta del club */}
-      <View style={styles.teamCard}>
-        {!team ? (
-          <ActivityIndicator color={colors.primary} style={styles.teamLoader} />
-        ) : (
-          <>
-            <View style={styles.badgeBox}>
-              {info?.badge ? (
-                <Image source={{ uri: info.badge }} style={styles.badge} resizeMode="contain" />
-              ) : (
-                <Text style={styles.badgeFallback}>⚽</Text>
-              )}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.homeScroll}>
+        {/* Tarjeta del club */}
+        <View style={styles.teamCard}>
+          {!team ? (
+            <ActivityIndicator color={colors.primary} style={styles.teamLoader} />
+          ) : (
+            <>
+              <View style={styles.badgeBox}>
+                {info?.badge ? (
+                  <Image source={{ uri: info.badge }} style={styles.badge} resizeMode="contain" />
+                ) : (
+                  <Text style={styles.badgeFallback}>⚽</Text>
+                )}
+              </View>
+              <View style={styles.teamInfo}>
+                <Text style={styles.teamName} numberOfLines={1}>
+                  {info?.name}
+                </Text>
+                <Text style={styles.teamMeta} numberOfLines={1}>
+                  {[info?.stadium, info?.formedYear && `Fundado en ${info.formedYear}`].filter(Boolean).join(' · ') ||
+                    info?.league}
+                </Text>
+                {offline && <Text style={styles.offline}>Datos del club no disponibles en línea</Text>}
+              </View>
+            </>
+          )}
+        </View>
+
+        {/* Credencial de socio visible en la página principal (QR sobre los datos) */}
+        <View style={styles.memberCard}>
+          <View style={styles.memberCardTop}>
+            <View
+              style={[
+                styles.statusPill,
+                { backgroundColor: membership.bg, borderColor: membership.border },
+              ]}
+            >
+              <Text style={[styles.statusPillText, { color: membership.text }]}>{membership.label}</Text>
             </View>
-            <View style={styles.teamInfo}>
-              <Text style={styles.teamName} numberOfLines={1}>
-                {info?.name}
+            <Pressable
+              onPress={() => openProfileModal(true)}
+              style={styles.editBadge}
+              accessibilityRole="button"
+              accessibilityLabel="Editar datos de mi perfil"
+            >
+              <Ionicons name="create-outline" size={rs(15)} color={colors.primary} />
+              <Text style={styles.editBadgeText}>Editar perfil</Text>
+            </Pressable>
+          </View>
+
+          <Pressable
+            style={styles.qrSection}
+            onPress={() => openProfileModal(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Ampliar credencial y código QR de socio"
+          >
+            <QrCodeBox value={qrPayload} size={rs(136)} color={colors.text} />
+            <Text style={styles.memberNumberText}>N° de Socio: {memberNumber}</Text>
+          </Pressable>
+
+          <View style={styles.memberDataGrid}>
+            <View style={styles.memberDataRow}>
+              <Text style={styles.memberDataLabel}>Nombre</Text>
+              <Text style={styles.memberDataValue} numberOfLines={1}>
+                {fullName}
               </Text>
-              <Text style={styles.teamMeta} numberOfLines={1}>
-                {[info?.stadium, info?.formedYear && `Fundado en ${info.formedYear}`].filter(Boolean).join(' · ') ||
-                  info?.league}
-              </Text>
-              {offline && <Text style={styles.offline}>Datos del club no disponibles en línea</Text>}
             </View>
-          </>
+            <View style={styles.memberDataRow}>
+              <Text style={styles.memberDataLabel}>RUT</Text>
+              <Text style={styles.memberDataValue}>{rutValue}</Text>
+            </View>
+            <View style={[styles.memberDataRow, styles.memberDataRowLast]}>
+              <Text style={styles.memberDataLabel}>Correo</Text>
+              <Text style={styles.memberDataValue} numberOfLines={1}>
+                {emailValue}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <Text style={styles.question}>¿Qué quieres hacer hoy?</Text>
+
+        {/* Acciones principales */}
+        <View style={styles.actions}>
+          <Pressable
+            style={({ pressed }) => [styles.action, styles.actionStore, pressed && styles.pressed]}
+            onPress={() => navigate('catalog')}
+            accessibilityRole="button"
+          >
+            <Ionicons name="shirt" size={rs(36)} color="#fff" />
+            <Text style={styles.actionTitle}>Tienda de indumentaria</Text>
+            <Text style={styles.actionDesc}>Camisetas, abrigos y accesorios oficiales</Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [styles.action, styles.actionTickets, pressed && styles.pressed]}
+            onPress={() => navigate('tickets')}
+            accessibilityRole="button"
+          >
+            <Ionicons name="ticket" size={rs(36)} color="#fff" />
+            <Text style={styles.actionTitle}>Entradas</Text>
+            <Text style={styles.actionDesc}>Compra tu entrada para el próximo partido</Text>
+          </Pressable>
+        </View>
+
+        {currentUser?.role === 'admin' && !!currentUser?.token && (
+          <Pressable
+            style={({ pressed }) => [styles.adminBtn, pressed && styles.pressed]}
+            onPress={() => navigate('admin')}
+            accessibilityRole="button"
+          >
+            <Ionicons name="settings-outline" size={rs(20)} color={colors.primary} />
+            <Text style={styles.adminText}>Modo administrador</Text>
+          </Pressable>
         )}
-      </View>
-
-      <Text style={styles.question}>¿Qué quieres hacer hoy?</Text>
-
-      {/* Acciones principales */}
-      <View style={styles.actions}>
-        <Pressable
-          style={({ pressed }) => [styles.action, styles.actionStore, pressed && styles.pressed]}
-          onPress={() => navigate('catalog')}
-          accessibilityRole="button"
-        >
-          <Ionicons name="shirt" size={rs(44)} color="#fff" />
-          <Text style={styles.actionTitle}>Tienda de indumentaria</Text>
-          <Text style={styles.actionDesc}>Camisetas, abrigos y accesorios oficiales</Text>
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.action, styles.actionTickets, pressed && styles.pressed]}
-          onPress={() => navigate('tickets')}
-          accessibilityRole="button"
-        >
-          <Ionicons name="ticket" size={rs(44)} color="#fff" />
-          <Text style={styles.actionTitle}>Entradas</Text>
-          <Text style={styles.actionDesc}>Compra tu entrada para el próximo partido</Text>
-        </Pressable>
-      </View>
-
-      {currentUser?.role === 'admin' && !!currentUser?.token && (
-        <Pressable
-          style={({ pressed }) => [styles.adminBtn, pressed && styles.pressed]}
-          onPress={() => navigate('admin')}
-          accessibilityRole="button"
-        >
-          <Ionicons name="settings-outline" size={rs(20)} color={colors.primary} />
-          <Text style={styles.adminText}>Modo administrador</Text>
-        </Pressable>
-      )}
+      </ScrollView>
 
       {/* Modal de perfil (Lectura y Edición) */}
       <Modal
@@ -219,6 +296,19 @@ export default function HomeScreen({ user, navigate, onLogout, onUpdateUser }) {
 
               {!isEditing ? (
                 <View>
+                  <View style={styles.modalQrWrap}>
+                    <QrCodeBox value={qrPayload} size={rs(164)} color={colors.text} />
+                    <Text style={styles.memberNumberText}>N° de Socio: {memberNumber}</Text>
+                    <View
+                      style={[
+                        styles.statusPill,
+                        { backgroundColor: membership.bg, borderColor: membership.border, marginTop: rs(6) },
+                      ]}
+                    >
+                      <Text style={[styles.statusPillText, { color: membership.text }]}>{membership.label}</Text>
+                    </View>
+                  </View>
+
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Nombre</Text>
                     <Text style={styles.infoValue}>{fullName}</Text>
@@ -353,17 +443,67 @@ const styles = StyleSheet.create({
   teamName: { fontSize: rs(17), fontWeight: '800', color: colors.text },
   teamMeta: { fontSize: rs(12), color: colors.muted, marginTop: rs(2) },
   offline: { fontSize: rs(11), color: colors.warning, marginTop: rs(2), fontWeight: '600' },
+  homeScroll: { paddingBottom: rs(20) },
+  memberCard: {
+    backgroundColor: colors.surface,
+    borderRadius: rs(18),
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginHorizontal: '6%',
+    marginTop: '3.5%',
+    padding: '4.5%',
+  },
+  memberCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: rs(10),
+  },
+  statusPill: {
+    paddingHorizontal: rs(10),
+    paddingVertical: rs(4),
+    borderRadius: rs(999),
+    borderWidth: 1,
+  },
+  statusPillText: { fontSize: rs(12), fontWeight: '800' },
+  qrSection: {
+    alignItems: 'center',
+    paddingVertical: rs(8),
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    marginBottom: rs(8),
+  },
+  modalQrWrap: {
+    alignItems: 'center',
+    marginBottom: rs(12),
+  },
+  memberNumberText: {
+    fontSize: rs(14),
+    fontWeight: '800',
+    color: colors.primary,
+    marginTop: rs(8),
+  },
+  memberDataGrid: { gap: rs(4) },
+  memberDataRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: rs(4),
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  memberDataRowLast: { borderBottomWidth: 0 },
+  memberDataLabel: { fontSize: rs(13), fontWeight: '600', color: colors.muted },
+  memberDataValue: { fontSize: rs(13), fontWeight: '700', color: colors.text, maxWidth: '65%', textAlign: 'right' },
   question: { fontSize: rs(17), fontWeight: '700', color: colors.text, paddingHorizontal: '6%', paddingTop: '4%' },
-  actions: { flex: 1, paddingHorizontal: '6%', paddingVertical: '3%', justifyContent: 'space-between' },
+  actions: { paddingHorizontal: '6%', paddingVertical: '3%', gap: rs(12) },
   action: {
-    flex: 1,
     borderRadius: rs(20),
-    padding: '6%',
+    padding: '5%',
     justifyContent: 'center',
-    marginBottom: '4%',
   },
   actionStore: { backgroundColor: colors.primary },
-  actionTickets: { backgroundColor: colors.accent, marginBottom: 0 },
+  actionTickets: { backgroundColor: colors.accent },
   adminBtn: {
     flexDirection: 'row',
     alignItems: 'center',

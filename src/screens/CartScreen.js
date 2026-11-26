@@ -49,9 +49,15 @@ export default function CartScreen({ user, navigate }) {
     setError('');
     setPhase('processing');
     try {
+      const purchasedItems = items.map((i) => ({
+        id: i.id,
+        name: i.name,
+        size: i.size || 'Única',
+        quantity: i.quantity,
+      }));
       const result = await processPayment({ total });
       if (!result.ok) throw new Error('Pago rechazado');
-      setReceipt({ orderId: result.orderId, total: result.total });
+      setReceipt({ orderId: result.orderId, total: result.total, items: purchasedItems });
       setPhase('success'); // primero la confirmación, para no mostrar un carrito vacío un instante
       await clearCart(); // luego se borra el estado y AsyncStorage (contador => 0)
     } catch (e) {
@@ -72,6 +78,15 @@ export default function CartScreen({ user, navigate }) {
           <Text style={styles.successTitle}>¡Pago exitoso!</Text>
           <Text style={styles.successText}>Pagaste {formatCLP(receipt.total)}</Text>
           <Text style={styles.successOrder}>Pedido {receipt.orderId}</Text>
+          {receipt.items?.length > 0 && (
+            <View style={styles.receiptItems}>
+              {receipt.items.map((it) => (
+                <Text key={it.id} style={styles.receiptItemText}>
+                  {it.quantity}× {it.name} · Talla {it.size}
+                </Text>
+              ))}
+            </View>
+          )}
         </View>
         <View style={styles.footer}>
           <Pressable style={styles.payButton} onPress={() => navigate('home')} accessibilityRole="button">
@@ -99,6 +114,7 @@ export default function CartScreen({ user, navigate }) {
         <Text style={styles.rowName} numberOfLines={2}>
           {item.name}
         </Text>
+        {!!item.size && <Text style={styles.rowSize}>Talla: {item.size}</Text>}
         <Text style={styles.rowPrice}>{formatCLP(item.price)}</Text>
         <View style={styles.stepper}>
           <Pressable style={styles.stepBtn} onPress={() => updateQuantity(item.id, -1)} accessibilityLabel="Quitar una unidad" hitSlop={6}>
@@ -124,6 +140,14 @@ export default function CartScreen({ user, navigate }) {
 
   const Summary = (
     <View style={styles.summary}>
+      {items.map((item) => (
+        <SummaryRow
+          key={`sum-${item.id}`}
+          label={`${item.quantity}× ${item.name} (Talla ${item.size || 'Única'})`}
+          value={formatCLP(item.price * item.quantity)}
+        />
+      ))}
+      <View style={styles.divider} />
       <SummaryRow label="Subtotal" value={formatCLP(subtotal)} />
       <SummaryRow
         label={`Descuento de Socio${discount.rate ? ` (${Math.round(discount.rate * 100)}%)` : ''}`}
@@ -217,6 +241,7 @@ const styles = StyleSheet.create({
   thumbEmoji: { fontSize: rs(30) },
   rowInfo: { flex: 1, marginHorizontal: '3%' },
   rowName: { fontSize: rs(14), fontWeight: '600', color: colors.text },
+  rowSize: { fontSize: rs(12), color: colors.muted, marginTop: rs(2) },
   rowPrice: { fontSize: rs(14), fontWeight: '800', color: colors.primary, marginTop: rs(2) },
   stepper: { flexDirection: 'row', alignItems: 'center', marginTop: rs(8) },
   stepBtn: {
@@ -252,4 +277,14 @@ const styles = StyleSheet.create({
   successTitle: { fontSize: rs(26), fontWeight: '800', color: colors.text, marginTop: rs(12) },
   successText: { fontSize: rs(17), color: colors.text, marginTop: rs(6) },
   successOrder: { fontSize: rs(13), color: colors.muted, marginTop: rs(4) },
+  receiptItems: {
+    marginTop: rs(14),
+    width: '100%',
+    backgroundColor: colors.surface,
+    borderRadius: rs(12),
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: rs(12),
+  },
+  receiptItemText: { fontSize: rs(13), color: colors.text, marginVertical: rs(2), textAlign: 'center' },
 });

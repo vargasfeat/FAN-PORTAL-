@@ -1,5 +1,12 @@
-/** POST /api/auth/login  { rut, password } -> { token, user } */
-const { login } = require('../services/auth.service');
+/** Controlador de autenticacion: login, registro y actualizacion de perfil. */
+const { login, register, updateProfile } = require('../services/auth.service');
+
+function handleAuthError(res, error) {
+  if (!error.status) console.error('Error en auth.controller:', error);
+  return res.status(error.status || 500).json({
+    error: error.status ? error.message : 'Error interno del servidor.',
+  });
+}
 
 async function loginHandler(req, res) {
   try {
@@ -7,10 +14,38 @@ async function loginHandler(req, res) {
     const session = await login(rut, password);
     res.status(200).json(session);
   } catch (error) {
-    res.status(error.status || 500).json({
-      error: error.status ? error.message : 'Error interno del servidor.',
-    });
+    handleAuthError(res, error);
   }
 }
 
-module.exports = { login: loginHandler };
+async function registerHandler(req, res) {
+  try {
+    const { rut, nombre, email, password } = req.body || {};
+    const usuario = await register({ rut, nombre, email, password });
+    res.status(201).json({
+      mensaje: 'Usuario creado correctamente',
+      usuario,
+    });
+  } catch (error) {
+    handleAuthError(res, error);
+  }
+}
+
+async function updateProfileHandler(req, res) {
+  try {
+    const { nombre, email, password } = req.body || {};
+    const usuario = await updateProfile(req.user?.sub, { nombre, email, password });
+    res.status(200).json({
+      mensaje: 'Perfil actualizado correctamente',
+      usuario,
+    });
+  } catch (error) {
+    handleAuthError(res, error);
+  }
+}
+
+module.exports = {
+  login: loginHandler,
+  register: registerHandler,
+  updateProfile: updateProfileHandler,
+};

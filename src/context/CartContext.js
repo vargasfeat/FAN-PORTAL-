@@ -40,15 +40,29 @@ export function CartProvider({ children }) {
   /** PC-02: la regla de stock también se valida aquí, no solo en la UI. */
   const addItem = useCallback(
     (product) => {
-      if (product.stock <= 0) return { ok: false, reason: 'sin_stock' };
+      const size = product.selectedSize || product.size || null;
+      const itemId = size ? `${product.id}__${size}` : product.id;
+      const maxStock = Number(product.selectedStock ?? product.stock ?? 0);
+
+      if (maxStock <= 0) return { ok: false, reason: 'sin_stock' };
       const current = itemsRef.current;
-      const existing = current.find((i) => i.id === product.id);
-      if (existing && existing.quantity >= product.stock) return { ok: false, reason: 'limite_stock' };
+      const existing = current.find((i) => i.id === itemId);
+      if (existing && existing.quantity >= maxStock) return { ok: false, reason: 'limite_stock' };
 
       commit(
         existing
-          ? current.map((i) => (i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i))
-          : [...current, { ...product, quantity: 1 }]
+          ? current.map((i) => (i.id === itemId ? { ...i, quantity: i.quantity + 1 } : i))
+          : [
+              ...current,
+              {
+                ...product,
+                id: itemId,
+                productId: product.id,
+                size,
+                stock: maxStock,
+                quantity: 1,
+              },
+            ]
       );
       return { ok: true };
     },
